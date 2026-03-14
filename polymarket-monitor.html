@@ -382,6 +382,18 @@
   </div>
 </div>
 
+<!-- Active market info bar -->
+<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 16px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+  <span style="font-size:10px;color:var(--muted);font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:0.07em;">Active market:</span>
+  <span style="font-size:12px;color:var(--text);font-family:'Courier New',monospace;" id="market-slug">detecting...</span>
+  <span style="font-size:10px;color:var(--muted);font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:0.07em;margin-left:8px;">UP price:</span>
+  <span style="font-size:12px;color:var(--green);font-family:'Courier New',monospace;font-weight:600;" id="market-up">—</span>
+  <span style="font-size:10px;color:var(--muted);font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:0.07em;">DN price:</span>
+  <span style="font-size:12px;color:var(--red);font-family:'Courier New',monospace;font-weight:600;" id="market-dn">—</span>
+  <span style="font-size:10px;color:var(--muted);font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:0.07em;">Combined:</span>
+  <span style="font-size:12px;font-family:'Courier New',monospace;font-weight:600;" id="market-combined">—</span>
+</div>
+
 <!-- Main grid -->
 <div class="main-grid">
   <!-- BTC Chart + Indicators -->
@@ -407,8 +419,13 @@
         <div class="ind-bar"><div class="ind-fill" id="i-vol-bar" style="width:50%;background:var(--amber)"></div></div>
       </div>
       <div class="ind-item">
-        <div class="ind-label">Poly sim price</div>
+        <div class="ind-label">Poly price · <span id="poly-source" style="color:var(--amber)">connecting...</span></div>
         <div class="ind-val" id="i-poly">—</div>
+        <div style="display:flex;gap:6px;margin-top:4px;font-size:10px;font-family:'Courier New',monospace;">
+          <span style="color:var(--green)">UP: <span id="poly-up-price">—</span></span>
+          <span style="color:var(--muted)">|</span>
+          <span style="color:var(--red)">DN: <span id="poly-dn-price">—</span></span>
+        </div>
         <div class="ind-bar"><div class="ind-fill" id="i-poly-bar" style="width:50%;background:var(--purple)"></div></div>
       </div>
     </div>
@@ -518,6 +535,11 @@ const state = {
   momentum5: 0,
   volRatio: 1,
   polyPrice: 5,
+  polyUpPrice: 0,
+  polyDownPrice: 0,
+  polySide: '—',
+  polySlug: '—',
+  polySource: 'simulated',
   scanned: 0,
   opps: 0,
   pnl: 0,
@@ -647,8 +669,63 @@ function computeIndicators() {
   state.momentum5 = p.length >= 6 ? ((p[p.length-1] - p[p.length-6]) / p[p.length-6]) * 100 : 0;
   const avgVol = state.volumes.slice(0, -1).reduce((a, b) => a + b, 0) / Math.max(state.volumes.length - 1, 1);
   state.volRatio = avgVol > 0 ? (state.volumes[state.volumes.length - 1] || avgVol) / avgVol : 1;
-  // Simulated polymarket price — replace with CLOB API call in next version
-  state.polyPrice = parseFloat((0.5 + Math.random() * 14).toFixed(1));
+  // polyPrice is now set by fetchPolyPrice() — only fallback if never set
+  if (state.polySource !== 'live' && state.polyPrice <= 0) {
+    state.polyPrice = parseFloat((0.5 + Math.random() * 14).toFixed(1));
+  }
+}
+
+// ── Polymarket CLOB API ──
+function getPolySlug() {
+  const now = new Date();
+  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const utcSec = Math.floor(utcMs / 1000);
+  const boundary = utcSec - (utcSec % 900);
+  return { slug: 'btc-updown-15m-' + boundary, ts: boundary };
+}
+
+async function fetchPolyPrice() {
+  const { slug } = getPolySlug();
+  const endpoints = [
+    'https://gamma-api.polymarket.com/markets?slug=' + slug,
+    'https://corsproxy.io/?' + encodeURIComponent('https://gamma-api.polymarket.com/markets?slug=' + slug),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://gamma-api.polymarket.com/markets?slug=' + slug)
+  ];
+  for (const url of endpoints) {
+    try {
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const d = await r.json();
+      const markets = Array.isArray(d) ? d : (d.data || []);
+      if (markets.length > 0) {
+        const m = markets[0];
+        // outcomePrices is a JSON string array: ["upPrice","downPrice"]
+        let prices = m.outcomePrices;
+        if (typeof prices === 'string') prices = JSON.parse(prices);
+        if (Array.isArray(prices) && prices.length >= 2) {
+          const upCents = parseFloat((parseFloat(prices[0]) * 100).toFixed(1));
+          const downCents = parseFloat((parseFloat(prices[1]) * 100).toFixed(1));
+          state.polyUpPrice = upCents;
+          state.polyDownPrice = downCents;
+          // Use the cheaper side as our opportunity price
+          state.polyPrice = Math.min(upCents, downCents);
+          state.polySide = upCents <= downCents ? 'UP' : 'DOWN';
+          state.polySlug = slug;
+          state.polySource = 'live';
+          document.getElementById('poly-source').textContent = 'Polymarket LIVE';
+          document.getElementById('poly-source').style.color = 'var(--green)';
+          return true;
+        }
+      }
+    } catch (e) {}
+  }
+  // All endpoints failed — keep last known or stay simulated
+  if (state.polySource !== 'live') {
+    state.polyPrice = parseFloat((0.5 + Math.random() * 14).toFixed(1));
+    state.polySide = Math.random() > 0.5 ? 'UP' : 'DOWN';
+    document.getElementById('poly-source').textContent = 'Poly simulated';
+    document.getElementById('poly-source').style.color = 'var(--amber)';
+  }
+  return false;
 }
 
 function scoreSignals() {
@@ -780,10 +857,24 @@ function updateUI() {
   document.getElementById('i-vol-bar').style.width = Math.min(volRatio / 3 * 100, 100) + '%';
   document.getElementById('i-vol-bar').style.background = volRatio > 1.5 ? 'var(--green)' : volRatio > 1 ? 'var(--amber)' : 'var(--red)';
 
-  document.getElementById('i-poly').textContent = polyPrice.toFixed(1) + '¢';
+  const polyLabel = state.polySource === 'live'
+    ? state.polyPrice.toFixed(1) + '¢ (' + state.polySide + ')'
+    : state.polyPrice.toFixed(1) + '¢ (sim)';
+  document.getElementById('i-poly').textContent = polyLabel;
   document.getElementById('i-poly').className = 'ind-val ' + (polyPrice < thresh ? 'green' : 'red');
   document.getElementById('i-poly-bar').style.width = Math.min(polyPrice / 20 * 100, 100) + '%';
   document.getElementById('i-poly-bar').style.background = polyPrice < thresh ? 'var(--green)' : 'var(--red)';
+  if (state.polyUpPrice > 0) {
+    document.getElementById('poly-up-price').textContent = state.polyUpPrice.toFixed(1) + '¢';
+    document.getElementById('poly-dn-price').textContent = state.polyDownPrice.toFixed(1) + '¢';
+    document.getElementById('market-slug').textContent = state.polySlug;
+    document.getElementById('market-up').textContent = state.polyUpPrice.toFixed(1) + '¢';
+    document.getElementById('market-dn').textContent = state.polyDownPrice.toFixed(1) + '¢';
+    const combined = ((state.polyUpPrice + state.polyDownPrice) / 100).toFixed(3);
+    const combEl = document.getElementById('market-combined');
+    combEl.textContent = '$' + combined;
+    combEl.style.color = parseFloat(combined) < 0.99 ? 'var(--green)' : 'var(--muted)';
+  }
 
   // Signals
   const setSignal = (id, text, type) => {
@@ -843,7 +934,7 @@ function updateUI() {
       <span style="color:${rsi<35?'var(--green)':rsi>65?'var(--amber)':'var(--muted)'}">${rsi}</span>
       <span style="color:${momentum5>0?'var(--green)':'var(--red)'}">${momentum5>=0?'+':''}${momentum5.toFixed(3)}%</span>
       <span style="color:${volRatio>1.5?'var(--green)':volRatio>1?'var(--amber)':'var(--red)'}">${volRatio.toFixed(1)}x</span>
-      <span style="color:var(--green);font-weight:600">${polyPrice.toFixed(1)}¢</span>
+      <span style="color:var(--green);font-weight:600">${polyPrice.toFixed(1)}¢ ${state.polySide}</span>
       <span style="color:${sigs.score>=75?'var(--green)':sigs.score>=50?'var(--amber)':'var(--red)'}">${sigs.score}%</span>
       <span><span class="badge ${won?'badge-green':'badge-red'}">${won?'✓ Won':'✗ Expired'}</span></span>
     `;
@@ -877,6 +968,17 @@ async function tick() {
   updateUI();
 }
 
+let polyTickCount = 0;
+async function masterTick() {
+  if (!state.running) return;
+  polyTickCount++;
+  // Fetch Polymarket price every 3 ticks (~15s) to avoid rate limiting
+  if (polyTickCount % 3 === 1) {
+    await fetchPolyPrice();
+  }
+  await tick();
+}
+
 function toggleRun() {
   state.running = !state.running;
   const btn = document.getElementById('toggle-btn');
@@ -902,14 +1004,17 @@ function updateBudget(val) {
 }
 
 // Set refresh interval
-let currentInterval = setInterval(tick, 5000);
+let currentInterval = setInterval(masterTick, 5000);
 document.getElementById('refresh-rate').addEventListener('change', function() {
   clearInterval(currentInterval);
-  currentInterval = setInterval(tick, parseInt(this.value));
+  currentInterval = setInterval(masterTick, parseInt(this.value));
 });
 
 // Init
-fetchKlines().then(() => tick());
+fetchKlines().then(async () => {
+  await fetchPolyPrice();
+  tick();
+});
 setInterval(fetchKlines, 60000);
 </script>
 </body>
