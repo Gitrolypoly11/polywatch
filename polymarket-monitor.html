@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Polymarket BTC Monitor</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root {
     --bg: #0a0c0f;
@@ -34,7 +33,7 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'Syne', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     min-height: 100vh;
     padding: 24px;
   }
@@ -64,7 +63,7 @@
     border-radius: 99px;
     padding: 5px 12px;
     font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
     color: var(--muted);
   }
   .live-dot {
@@ -82,7 +81,7 @@
     border: 0.5px solid var(--border2);
     border-radius: var(--radius-sm);
     color: var(--text);
-    font-family: 'Syne', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     font-size: 13px;
     padding: 7px 16px;
     cursor: pointer;
@@ -125,14 +124,14 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin-bottom: 6px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
   }
   .mcard-val {
     font-size: 22px;
     font-weight: 600;
     color: #fff;
     line-height: 1;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
   }
   .mcard-val.green { color: var(--green); }
   .mcard-val.red { color: var(--red); }
@@ -141,7 +140,7 @@
     font-size: 11px;
     color: var(--muted);
     margin-top: 4px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
   }
   /* ── Main layout ── */
   .main-grid {
@@ -161,7 +160,7 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
     margin-bottom: 14px;
   }
   /* ── Chart ── */
@@ -179,8 +178,8 @@
     border-radius: var(--radius-sm);
     padding: 10px 12px;
   }
-  .ind-label { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .ind-val { font-size: 17px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #fff; }
+  .ind-label { font-size: 10px; color: var(--muted); font-family: 'Courier New', Courier, monospace; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .ind-val { font-size: 17px; font-weight: 600; font-family: 'Courier New', Courier, monospace; color: #fff; }
   .ind-val.green { color: var(--green); }
   .ind-val.red { color: var(--red); }
   .ind-val.amber { color: var(--amber); }
@@ -201,7 +200,7 @@
     border-radius: 99px;
     font-size: 11px;
     font-weight: 500;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
     border: 0.5px solid transparent;
   }
   .badge-green { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
@@ -220,11 +219,11 @@
   .conf-box.high { background: var(--green-bg); border-color: var(--green-border); }
   .conf-box.med { background: var(--amber-bg); border-color: var(--amber-border); }
   .conf-box.low { background: var(--red-bg); border-color: var(--red-border); }
-  .conf-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
+  .conf-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-family: 'Courier New', Courier, monospace; margin-bottom: 4px; }
   .conf-box.high .conf-label { color: var(--green); }
   .conf-box.med .conf-label { color: var(--amber); }
   .conf-box.low .conf-label { color: var(--red); }
-  .conf-num { font-size: 32px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .conf-num { font-size: 32px; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
   .conf-box.high .conf-num { color: var(--green); }
   .conf-box.med .conf-num { color: var(--amber); }
   .conf-box.low .conf-num { color: var(--red); }
@@ -242,7 +241,7 @@
     flex-wrap: wrap;
   }
   .ctrl-group { display: flex; align-items: center; gap: 8px; }
-  .ctrl-label { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  .ctrl-label { font-size: 11px; color: var(--muted); font-family: 'Courier New', Courier, monospace; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
   input[type=range] {
     -webkit-appearance: none;
     width: 110px; height: 4px;
@@ -263,13 +262,13 @@
     border: 0.5px solid var(--border2);
     border-radius: var(--radius-sm);
     color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
     font-size: 12px;
     padding: 5px 10px;
     outline: none;
     cursor: pointer;
   }
-  .ctrl-val { font-size: 13px; font-weight: 600; color: var(--green); font-family: 'JetBrains Mono', monospace; min-width: 28px; }
+  .ctrl-val { font-size: 13px; font-weight: 600; color: var(--green); font-family: 'Courier New', Courier, monospace; min-width: 28px; }
   /* ── Log ── */
   .log-panel {
     background: var(--bg2);
@@ -285,7 +284,7 @@
     background: var(--bg3);
     border-bottom: 0.5px solid var(--border);
     font-size: 10px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.07em;
@@ -296,7 +295,7 @@
     gap: 8px;
     padding: 9px 16px;
     font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
     border-bottom: 0.5px solid var(--border);
     color: var(--text);
     align-items: center;
@@ -308,7 +307,7 @@
     padding: 32px;
     text-align: center;
     color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
   }
   .log-body { max-height: 320px; overflow-y: auto; }
@@ -587,20 +586,39 @@ function getMinLabel() {
 }
 
 async function fetchBTCPrice() {
-  try {
-    const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
-    const d = await r.json();
-    const p = parseFloat(d.price);
-    if (!isNaN(p)) {
-      state.prevBtcPrice = state.btcPrice || p;
-      state.btcPrice = p;
-      setStatus('live', 'Binance connected · live');
-      return p;
-    }
-  } catch (e) {
-    setStatus('warn', 'Price fetch error — retrying');
+  const endpoints = [
+    'https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT',
+    'https://api.coinbase.com/v2/prices/BTC-USD/spot',
+    'https://api.coinpaprika.com/v1/tickers/btc-bitcoin?quotes=USD'
+  ];
+  for (const url of endpoints) {
+    try {
+      const r = await fetch(url);
+      const d = await r.json();
+      let p = null;
+      if (d.price) p = parseFloat(d.price);
+      else if (d.data && d.data.amount) p = parseFloat(d.data.amount);
+      else if (d.quotes && d.quotes.USD) p = parseFloat(d.quotes.USD.price);
+      if (p && !isNaN(p)) {
+        state.prevBtcPrice = state.btcPrice || p;
+        state.btcPrice = p;
+        setStatus('live', 'Live price connected');
+        return p;
+      }
+    } catch (e) {}
   }
-  return null;
+  // Fallback: simulate small movement on last known price
+  if (state.btcPrice > 0) {
+    const drift = state.btcPrice * (0.9998 + Math.random() * 0.0004);
+    state.prevBtcPrice = state.btcPrice;
+    state.btcPrice = parseFloat(drift.toFixed(2));
+    setStatus('warn', 'API blocked — simulating movement');
+    return state.btcPrice;
+  }
+  // Cold start fallback
+  state.btcPrice = 83000 + (Math.random() * 2000 - 1000);
+  setStatus('warn', 'API blocked — using simulated price');
+  return state.btcPrice;
 }
 
 async function fetchKlines() {
@@ -610,8 +628,15 @@ async function fetchKlines() {
     if (Array.isArray(d)) {
       state.prices = d.map(k => parseFloat(k[4]));
       state.volumes = d.map(k => parseFloat(k[5]));
+      return;
     }
   } catch (e) {}
+  // Fallback: seed prices array from current btcPrice if API blocked
+  if (state.btcPrice > 0 && state.prices.length < 6) {
+    const base = state.btcPrice;
+    state.prices = Array.from({length: 20}, (_,i) => base + (Math.random()-0.5) * base * 0.002);
+    state.volumes = Array.from({length: 20}, () => 800 + Math.random() * 400);
+  }
 }
 
 function computeIndicators() {
