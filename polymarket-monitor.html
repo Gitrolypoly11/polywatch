@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polymarket BTC Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #111418;
+    --bg3: #181c22;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --green: #22d87a;
+    --green-bg: rgba(34,216,122,0.08);
+    --green-border: rgba(34,216,122,0.2);
+    --red: #f05454;
+    --red-bg: rgba(240,84,84,0.08);
+    --red-border: rgba(240,84,84,0.2);
+    --amber: #f5a623;
+    --amber-bg: rgba(245,166,35,0.08);
+    --amber-border: rgba(245,166,35,0.2);
+    --blue: #4a9eff;
+    --blue-bg: rgba(74,158,255,0.08);
+    --purple: #a78bfa;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+  .logo span { color: var(--green); }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--bg3);
+    border: 0.5px solid var(--border2);
+    border-radius: 99px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.8s infinite;
+  }
+  .live-dot.warn { background: var(--amber); animation: none; }
+  .live-dot.off { background: var(--red); animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .btn {
+    background: var(--bg3);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn:hover { background: #1e242d; border-color: rgba(255,255,255,0.2); }
+  .btn:active { transform: scale(0.97); }
+  .btn.pause { border-color: var(--amber-border); color: var(--amber); }
+  .btn.reset { border-color: var(--border2); }
+  /* ── Metrics row ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .mcard {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .mcard::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent, transparent);
+  }
+  .mcard.accent-green { --accent: var(--green); }
+  .mcard.accent-blue { --accent: var(--blue); }
+  .mcard.accent-amber { --accent: var(--amber); }
+  .mcard.accent-red { --accent: var(--red); }
+  .mcard.accent-purple { --accent: var(--purple); }
+  .mcard-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .mcard-val {
+    font-size: 22px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .mcard-val.green { color: var(--green); }
+  .mcard-val.red { color: var(--red); }
+  .mcard-val.amber { color: var(--amber); }
+  .mcard-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  /* ── Main layout ── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .panel {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .panel-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 14px;
+  }
+  /* ── Chart ── */
+  .chart-wrap { position: relative; height: 180px; }
+  /* ── Indicators ── */
+  .ind-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .ind-item {
+    background: var(--bg3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .ind-label { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .ind-val { font-size: 17px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #fff; }
+  .ind-val.green { color: var(--green); }
+  .ind-val.red { color: var(--red); }
+  .ind-val.amber { color: var(--amber); }
+  .ind-bar { height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+  .ind-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+  /* ── Signal panel ── */
+  .signal-rows { display: flex; flex-direction: column; gap: 8px; }
+  .signal-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+  .signal-key { color: var(--muted); font-size: 12px; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    border: 0.5px solid transparent;
+  }
+  .badge-green { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+  .badge-red { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-border); }
+  .badge-gray { background: var(--bg3); color: var(--muted); border-color: var(--border); }
+  /* ── Confidence ── */
+  .conf-box {
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    text-align: center;
+    margin-top: 12px;
+    border: 0.5px solid transparent;
+    transition: background 0.3s, border-color 0.3s;
+  }
+  .conf-box.high { background: var(--green-bg); border-color: var(--green-border); }
+  .conf-box.med { background: var(--amber-bg); border-color: var(--amber-border); }
+  .conf-box.low { background: var(--red-bg); border-color: var(--red-border); }
+  .conf-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
+  .conf-box.high .conf-label { color: var(--green); }
+  .conf-box.med .conf-label { color: var(--amber); }
+  .conf-box.low .conf-label { color: var(--red); }
+  .conf-num { font-size: 32px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .conf-box.high .conf-num { color: var(--green); }
+  .conf-box.med .conf-num { color: var(--amber); }
+  .conf-box.low .conf-num { color: var(--red); }
+  .conf-desc { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  /* ── Controls ── */
+  .controls-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 18px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .ctrl-group { display: flex; align-items: center; gap: 8px; }
+  .ctrl-label { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 110px; height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    outline: none;
+    border: 0.5px solid var(--border2);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--green);
+    cursor: pointer;
+  }
+  select {
+    background: var(--bg3);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 5px 10px;
+    outline: none;
+    cursor: pointer;
+  }
+  .ctrl-val { font-size: 13px; font-weight: 600; color: var(--green); font-family: 'JetBrains Mono', monospace; min-width: 28px; }
+  /* ── Log ── */
+  .log-panel {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .log-header-row {
+    display: grid;
+    grid-template-columns: 80px 110px 60px 80px 60px 65px 70px 90px;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--bg3);
+    border-bottom: 0.5px solid var(--border);
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .log-entry {
+    display: grid;
+    grid-template-columns: 80px 110px 60px 80px 60px 65px 70px 90px;
+    gap: 8px;
+    padding: 9px 16px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--text);
+    align-items: center;
+    transition: background 0.1s;
+  }
+  .log-entry:hover { background: var(--bg3); }
+  .log-entry:last-child { border-bottom: none; }
+  .empty-log {
+    padding: 32px;
+    text-align: center;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  .log-body { max-height: 320px; overflow-y: auto; }
+  .log-body::-webkit-scrollbar { width: 4px; }
+  .log-body::-webkit-scrollbar-track { background: var(--bg2); }
+  .log-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  /* ── Budget bar ── */
+  .budget-track { height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .budget-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.4s; }
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .metrics { grid-template-columns: repeat(3, 1fr); }
+    .main-grid { grid-template-columns: 1fr; }
+    .log-header-row, .log-entry { grid-template-columns: 70px 100px 55px 75px 55px 60px 65px 80px; font-size: 11px; }
+  }
+  @media (max-width: 600px) {
+    body { padding: 12px; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .log-header-row, .log-entry { display: none; }
+    .log-mobile { display: block !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">POLY<span>WATCH</span></div>
+    <div class="status-pill">
+      <span class="live-dot" id="status-dot"></span>
+      <span id="status-text">Connecting...</span>
+    </div>
+    <div class="status-pill" style="color: var(--text);">
+      BTC <span id="header-price" style="color:var(--green);margin-left:6px;">—</span>
+      <span id="header-change" style="margin-left:6px;font-size:11px;"></span>
+    </div>
+  </div>
+  <div class="header-right">
+    <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;" id="last-update">—</span>
+    <button class="btn pause" id="toggle-btn" onclick="toggleRun()">⏸ Pause</button>
+    <button class="btn reset" onclick="resetAll()">↺ Reset</button>
+  </div>
+</div>
+
+<!-- Metrics -->
+<div class="metrics">
+  <div class="mcard accent-blue">
+    <div class="mcard-label">BTC Price</div>
+    <div class="mcard-val" id="m-price">—</div>
+    <div class="mcard-sub" id="m-price-change">fetching...</div>
+  </div>
+  <div class="mcard accent-green">
+    <div class="mcard-label">RSI (14)</div>
+    <div class="mcard-val" id="m-rsi">—</div>
+    <div class="mcard-sub" id="m-rsi-label">—</div>
+  </div>
+  <div class="mcard accent-amber">
+    <div class="mcard-label">5-min Momentum</div>
+    <div class="mcard-val" id="m-mom">—</div>
+    <div class="mcard-sub" id="m-mom-label">—</div>
+  </div>
+  <div class="mcard accent-purple">
+    <div class="mcard-label">Opportunities</div>
+    <div class="mcard-val green" id="m-opps">0</div>
+    <div class="mcard-sub" id="m-scan">0 windows scanned</div>
+  </div>
+  <div class="mcard accent-green">
+    <div class="mcard-label">Sim P&L ($50)</div>
+    <div class="mcard-val" id="m-pnl">$0.00</div>
+    <div class="budget-track"><div class="budget-fill" id="budget-fill" style="width:100%"></div></div>
+    <div class="mcard-sub" id="m-budget">$50.00 remaining</div>
+  </div>
+</div>
+
+<!-- Main grid -->
+<div class="main-grid">
+  <!-- BTC Chart + Indicators -->
+  <div>
+    <div class="panel" style="margin-bottom:14px;">
+      <div class="panel-title">BTC/USDT — live 1m candles (Binance)</div>
+      <div class="chart-wrap"><canvas id="btcChart"></canvas></div>
+    </div>
+    <div class="ind-grid">
+      <div class="ind-item">
+        <div class="ind-label">RSI (14)</div>
+        <div class="ind-val" id="i-rsi">—</div>
+        <div class="ind-bar"><div class="ind-fill" id="i-rsi-bar" style="width:50%;background:var(--blue)"></div></div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-label">5-min momentum</div>
+        <div class="ind-val" id="i-mom">—</div>
+        <div class="ind-bar"><div class="ind-fill" id="i-mom-bar" style="width:50%;background:var(--green)"></div></div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-label">Volume vs avg</div>
+        <div class="ind-val" id="i-vol">—</div>
+        <div class="ind-bar"><div class="ind-fill" id="i-vol-bar" style="width:50%;background:var(--amber)"></div></div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-label">Poly sim price</div>
+        <div class="ind-val" id="i-poly">—</div>
+        <div class="ind-bar"><div class="ind-fill" id="i-poly-bar" style="width:50%;background:var(--purple)"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signal panel -->
+  <div class="panel">
+    <div class="panel-title">Signal analysis</div>
+    <div class="signal-rows">
+      <div class="signal-row">
+        <span class="signal-key">RSI signal</span>
+        <span class="badge badge-gray" id="sig-rsi">—</span>
+      </div>
+      <div class="signal-row">
+        <span class="signal-key">Momentum</span>
+        <span class="badge badge-gray" id="sig-mom">—</span>
+      </div>
+      <div class="signal-row">
+        <span class="signal-key">Volume</span>
+        <span class="badge badge-gray" id="sig-vol">—</span>
+      </div>
+      <div class="signal-row">
+        <span class="signal-key">Poly price</span>
+        <span class="badge badge-gray" id="sig-poly">—</span>
+      </div>
+      <div class="signal-row">
+        <span class="signal-key">Direction bias</span>
+        <span class="badge badge-gray" id="sig-dir">—</span>
+      </div>
+    </div>
+    <div class="conf-box low" id="conf-box">
+      <div class="conf-label">Confidence score</div>
+      <div class="conf-num" id="conf-num">—</div>
+      <div class="conf-desc" id="conf-desc">Waiting for data...</div>
+    </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:0.5px solid var(--border);">
+      <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Next action</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.6;" id="next-action">Collecting data...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls-bar">
+  <div class="ctrl-group">
+    <span class="ctrl-label">Max entry</span>
+    <input type="range" min="1" max="15" value="5" step="1" id="threshold" oninput="document.getElementById('thresh-out').textContent=this.value+'¢'">
+    <span class="ctrl-val" id="thresh-out">5¢</span>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Min confidence</span>
+    <select id="min-conf">
+      <option value="0">Any</option>
+      <option value="50" selected>50%+</option>
+      <option value="75">75%+ (high only)</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Budget ($)</span>
+    <input type="range" min="20" max="500" value="50" step="10" id="budget-slider" oninput="updateBudget(this.value)">
+    <span class="ctrl-val" id="budget-out">$50</span>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Refresh</span>
+    <select id="refresh-rate">
+      <option value="5000" selected>5s</option>
+      <option value="10000">10s</option>
+      <option value="30000">30s</option>
+    </select>
+  </div>
+</div>
+
+<!-- Log -->
+<div class="log-panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:0.5px solid var(--border);">
+    <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);font-family:'JetBrains Mono',monospace;">Opportunity log</span>
+    <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;" id="log-count">0 entries</span>
+  </div>
+  <div class="log-header-row">
+    <span>Time</span>
+    <span>BTC $</span>
+    <span>RSI</span>
+    <span>Momentum</span>
+    <span>Vol</span>
+    <span>Price</span>
+    <span>Conf</span>
+    <span>Result</span>
+  </div>
+  <div class="log-body" id="log-body">
+    <div class="empty-log">→ Scanning for opportunities below threshold...</div>
+  </div>
+</div>
+
+<div style="margin-top:16px;text-align:center;font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;">
+  POLYWATCH v0.1 · Read-only monitor · BTC price: Binance API · Poly prices: simulated (CLOB API coming next)
+</div>
+
+<script>
+const state = {
+  running: true,
+  prices: [],
+  volumes: [],
+  btcPrice: 0,
+  prevBtcPrice: 0,
+  rsi: 50,
+  momentum1: 0,
+  momentum5: 0,
+  volRatio: 1,
+  polyPrice: 5,
+  scanned: 0,
+  opps: 0,
+  pnl: 0,
+  spent: 0,
+  budget: 50,
+  logCount: 0,
+  intervalId: null
+};
+
+// Chart setup
+const ctx = document.getElementById('btcChart').getContext('2d');
+const btcChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      data: [],
+      borderColor: '#4a9eff',
+      backgroundColor: 'rgba(74,158,255,0.06)',
+      borderWidth: 1.5,
+      pointRadius: 2,
+      pointBackgroundColor: '#4a9eff',
+      tension: 0.3,
+      fill: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        ticks: { color: '#6b7280', font: { size: 10, family: 'JetBrains Mono' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+        grid: { display: false },
+        border: { color: 'rgba(255,255,255,0.07)' }
+      },
+      y: {
+        ticks: { color: '#6b7280', font: { size: 10, family: 'JetBrains Mono' }, callback: v => '$' + v.toLocaleString() },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+        border: { color: 'rgba(255,255,255,0.07)' }
+      }
+    },
+    animation: false
+  }
+});
+
+function calcRSI(prices, period = 14) {
+  if (prices.length < period + 1) return 50;
+  let gains = 0, losses = 0;
+  for (let i = prices.length - period; i < prices.length; i++) {
+    const d = prices[i] - prices[i - 1];
+    if (d > 0) gains += d; else losses -= d;
+  }
+  if (losses === 0) return 100;
+  return Math.round(100 - 100 / (1 + (gains / period) / (losses / period)));
+}
+
+function getTimeStr() {
+  const n = new Date();
+  return n.toLocaleTimeString('en-US', { hour12: false });
+}
+
+function getMinLabel() {
+  const n = new Date();
+  return n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0');
+}
+
+async function fetchBTCPrice() {
+  try {
+    const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+    const d = await r.json();
+    const p = parseFloat(d.price);
+    if (!isNaN(p)) {
+      state.prevBtcPrice = state.btcPrice || p;
+      state.btcPrice = p;
+      setStatus('live', 'Binance connected · live');
+      return p;
+    }
+  } catch (e) {
+    setStatus('warn', 'Price fetch error — retrying');
+  }
+  return null;
+}
+
+async function fetchKlines() {
+  try {
+    const r = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=30');
+    const d = await r.json();
+    if (Array.isArray(d)) {
+      state.prices = d.map(k => parseFloat(k[4]));
+      state.volumes = d.map(k => parseFloat(k[5]));
+    }
+  } catch (e) {}
+}
+
+function computeIndicators() {
+  const p = state.prices;
+  if (p.length < 6) return;
+  state.rsi = calcRSI(p);
+  state.momentum1 = p.length >= 2 ? ((p[p.length-1] - p[p.length-2]) / p[p.length-2]) * 100 : 0;
+  state.momentum5 = p.length >= 6 ? ((p[p.length-1] - p[p.length-6]) / p[p.length-6]) * 100 : 0;
+  const avgVol = state.volumes.slice(0, -1).reduce((a, b) => a + b, 0) / Math.max(state.volumes.length - 1, 1);
+  state.volRatio = avgVol > 0 ? (state.volumes[state.volumes.length - 1] || avgVol) / avgVol : 1;
+  // Simulated polymarket price — replace with CLOB API call in next version
+  state.polyPrice = parseFloat((0.5 + Math.random() * 14).toFixed(1));
+}
+
+function scoreSignals() {
+  const { rsi, momentum5, volRatio, polyPrice } = state;
+  const thresh = parseInt(document.getElementById('threshold').value);
+  let score = 0;
+  let rsiSig, momSig, volSig, polySig, dirBias;
+
+  // RSI
+  if (rsi < 30) { rsiSig = 'oversold'; score += 30; }
+  else if (rsi < 40) { rsiSig = 'near oversold'; score += 18; }
+  else if (rsi > 70) { rsiSig = 'overbought'; score += 30; }
+  else if (rsi > 60) { rsiSig = 'near overbought'; score += 18; }
+  else { rsiSig = 'neutral'; }
+
+  // Momentum
+  if (Math.abs(momentum5) > 0.5) { momSig = momentum5 > 0 ? '↑ strong' : '↓ strong'; score += 25; }
+  else if (Math.abs(momentum5) > 0.2) { momSig = momentum5 > 0 ? '↑ mild' : '↓ mild'; score += 14; }
+  else { momSig = 'flat'; }
+
+  // Volume
+  if (volRatio > 2.0) { volSig = 'very high'; score += 25; }
+  else if (volRatio > 1.4) { volSig = 'elevated'; score += 16; }
+  else if (volRatio > 0.9) { volSig = 'normal'; score += 8; }
+  else { volSig = 'low'; score += 0; }
+
+  // Poly price
+  if (polyPrice < thresh) { polySig = polyPrice.toFixed(1) + '¢ ✓ below'; score += 20; }
+  else { polySig = polyPrice.toFixed(1) + '¢ — above'; }
+
+  // Direction bias
+  const rsiDown = rsi > 60; const momDown = momentum5 < -0.2;
+  const rsiUp = rsi < 40; const momUp = momentum5 > 0.2;
+  if (rsiDown && momDown) dirBias = '↓ Down bias';
+  else if (rsiUp && momUp) dirBias = '↑ Up bias';
+  else if (rsiDown || momDown) dirBias = '↓ Lean down';
+  else if (rsiUp || momUp) dirBias = '↑ Lean up';
+  else dirBias = '— No clear bias';
+
+  return { score: Math.min(score, 100), rsiSig, momSig, volSig, polySig, dirBias };
+}
+
+function badgeFor(val, type) {
+  if (type === 'rsi') {
+    if (val.includes('oversold') || val.includes('overbought')) return 'badge-green';
+    if (val.includes('near')) return 'badge-amber';
+    return 'badge-gray';
+  }
+  if (type === 'mom') {
+    if (val.includes('strong')) return 'badge-green';
+    if (val.includes('mild')) return 'badge-amber';
+    return 'badge-gray';
+  }
+  if (type === 'vol') {
+    if (val === 'very high' || val === 'elevated') return 'badge-green';
+    if (val === 'normal') return 'badge-amber';
+    return 'badge-red';
+  }
+  if (type === 'poly') {
+    return val.includes('✓') ? 'badge-green' : 'badge-red';
+  }
+  if (type === 'dir') {
+    if (val.includes('bias')) return 'badge-green';
+    if (val.includes('Lean')) return 'badge-amber';
+    return 'badge-gray';
+  }
+  return 'badge-gray';
+}
+
+function updateUI() {
+  const { rsi, momentum1, momentum5, volRatio, polyPrice, btcPrice, prevBtcPrice } = state;
+  const sigs = scoreSignals();
+  const thresh = parseInt(document.getElementById('threshold').value);
+  const minConf = parseInt(document.getElementById('min-conf').value);
+
+  // Header
+  if (btcPrice) {
+    document.getElementById('header-price').textContent = '$' + btcPrice.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
+    const chg = prevBtcPrice ? ((btcPrice - prevBtcPrice) / prevBtcPrice * 100) : 0;
+    const chgEl = document.getElementById('header-change');
+    chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(3) + '%';
+    chgEl.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+  document.getElementById('last-update').textContent = getTimeStr();
+
+  // Metric cards
+  if (btcPrice) {
+    document.getElementById('m-price').textContent = '$' + btcPrice.toLocaleString('en-US', {minimumFractionDigits:0,maximumFractionDigits:0});
+    const chg = prevBtcPrice ? ((btcPrice - prevBtcPrice) / prevBtcPrice * 100) : 0;
+    const cEl = document.getElementById('m-price-change');
+    cEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(4) + '% vs prev';
+    cEl.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  const rsiEl = document.getElementById('m-rsi');
+  rsiEl.textContent = rsi;
+  rsiEl.className = 'mcard-val ' + (rsi < 35 ? 'green' : rsi > 65 ? 'amber' : '');
+  document.getElementById('m-rsi-label').textContent = rsi < 35 ? 'Oversold' : rsi > 65 ? 'Overbought' : 'Neutral zone';
+
+  const momEl = document.getElementById('m-mom');
+  momEl.textContent = (momentum5 >= 0 ? '+' : '') + momentum5.toFixed(3) + '%';
+  momEl.className = 'mcard-val ' + (momentum5 > 0.2 ? 'green' : momentum5 < -0.2 ? 'red' : 'amber');
+  document.getElementById('m-mom-label').textContent = Math.abs(momentum5) > 0.5 ? 'Strong move' : Math.abs(momentum5) > 0.2 ? 'Mild move' : 'Flat';
+
+  document.getElementById('m-opps').textContent = state.opps;
+  document.getElementById('m-scan').textContent = state.scanned + ' scanned';
+
+  const pnlEl = document.getElementById('m-pnl');
+  pnlEl.textContent = (state.pnl >= 0 ? '+$' : '-$') + Math.abs(state.pnl).toFixed(2);
+  pnlEl.className = 'mcard-val ' + (state.pnl >= 0 ? 'green' : 'red');
+  const rem = Math.max(0, state.budget - state.spent);
+  document.getElementById('m-budget').textContent = '$' + rem.toFixed(2) + ' remaining';
+  document.getElementById('budget-fill').style.width = ((rem / state.budget) * 100) + '%';
+  document.getElementById('budget-fill').style.background = rem > state.budget * 0.5 ? 'var(--green)' : rem > state.budget * 0.2 ? 'var(--amber)' : 'var(--red)';
+
+  // Indicators
+  document.getElementById('i-rsi').textContent = rsi;
+  document.getElementById('i-rsi').className = 'ind-val ' + (rsi < 35 ? 'green' : rsi > 65 ? 'amber' : '');
+  document.getElementById('i-rsi-bar').style.width = rsi + '%';
+  document.getElementById('i-rsi-bar').style.background = rsi < 35 ? 'var(--green)' : rsi > 65 ? 'var(--amber)' : 'var(--blue)';
+
+  document.getElementById('i-mom').textContent = (momentum5 >= 0 ? '+' : '') + momentum5.toFixed(3) + '%';
+  document.getElementById('i-mom').className = 'ind-val ' + (momentum5 > 0 ? 'green' : 'red');
+  document.getElementById('i-mom-bar').style.width = Math.min(50 + momentum5 * 20, 100) + '%';
+  document.getElementById('i-mom-bar').style.background = momentum5 > 0 ? 'var(--green)' : 'var(--red)';
+
+  document.getElementById('i-vol').textContent = volRatio.toFixed(2) + 'x';
+  document.getElementById('i-vol').className = 'ind-val ' + (volRatio > 1.5 ? 'green' : volRatio > 1 ? 'amber' : 'red');
+  document.getElementById('i-vol-bar').style.width = Math.min(volRatio / 3 * 100, 100) + '%';
+  document.getElementById('i-vol-bar').style.background = volRatio > 1.5 ? 'var(--green)' : volRatio > 1 ? 'var(--amber)' : 'var(--red)';
+
+  document.getElementById('i-poly').textContent = polyPrice.toFixed(1) + '¢';
+  document.getElementById('i-poly').className = 'ind-val ' + (polyPrice < thresh ? 'green' : 'red');
+  document.getElementById('i-poly-bar').style.width = Math.min(polyPrice / 20 * 100, 100) + '%';
+  document.getElementById('i-poly-bar').style.background = polyPrice < thresh ? 'var(--green)' : 'var(--red)';
+
+  // Signals
+  const setSignal = (id, text, type) => {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'badge ' + badgeFor(text, type);
+  };
+  setSignal('sig-rsi', sigs.rsiSig, 'rsi');
+  setSignal('sig-mom', sigs.momSig, 'mom');
+  setSignal('sig-vol', sigs.volSig, 'vol');
+  setSignal('sig-poly', sigs.polySig, 'poly');
+  setSignal('sig-dir', sigs.dirBias, 'dir');
+
+  // Confidence
+  const cbox = document.getElementById('conf-box');
+  document.getElementById('conf-num').textContent = sigs.score + '%';
+  if (sigs.score >= 75) {
+    cbox.className = 'conf-box high';
+    document.getElementById('conf-desc').textContent = 'Strong setup — all signals aligned';
+  } else if (sigs.score >= 50) {
+    cbox.className = 'conf-box med';
+    document.getElementById('conf-desc').textContent = 'Medium — some signals confirm';
+  } else {
+    cbox.className = 'conf-box low';
+    document.getElementById('conf-desc').textContent = 'Weak — wait for better setup';
+  }
+
+  // Next action
+  const naEl = document.getElementById('next-action');
+  if (polyPrice < thresh && sigs.score >= minConf) {
+    naEl.innerHTML = '<span style="color:var(--green)">✓ Entry signal detected</span><br><span style="color:var(--muted);font-size:11px;">Would place: ' + sigs.dirBias.replace('↑','UP').replace('↓','DOWN').replace('bias','').replace('Lean','').trim() + ' @ ' + polyPrice.toFixed(1) + '¢ · ' + Math.floor(5 / (polyPrice/100)) + ' shares · $5.00 max</span>';
+  } else if (polyPrice >= thresh) {
+    naEl.innerHTML = '<span style="color:var(--muted)">Price too high (' + polyPrice.toFixed(1) + '¢ > ' + thresh + '¢ threshold)</span><br><span style="color:var(--muted);font-size:11px;">Waiting for cheaper entry...</span>';
+  } else {
+    naEl.innerHTML = '<span style="color:var(--muted)">Confidence too low (' + sigs.score + '% < ' + minConf + '% minimum)</span><br><span style="color:var(--muted);font-size:11px;">Signals not aligned — skipping</span>';
+  }
+
+  // Log entry
+  state.scanned++;
+  if (polyPrice < thresh && sigs.score >= minConf && state.spent < state.budget) {
+    state.opps++;
+    const shares = Math.floor(5 / (polyPrice / 100));
+    const cost = shares * (polyPrice / 100);
+    state.spent += cost;
+    const won = Math.random() < (polyPrice / 100) * 3;
+    state.pnl += won ? shares - cost : -cost;
+
+    state.logCount++;
+    document.getElementById('log-count').textContent = state.logCount + ' entries';
+
+    const row = document.createElement('div');
+    row.className = 'log-entry';
+    row.style.borderLeft = '2px solid ' + (won ? 'var(--green)' : 'var(--red)');
+    row.innerHTML = `
+      <span style="color:var(--muted)">${getTimeStr()}</span>
+      <span>$${btcPrice ? btcPrice.toLocaleString('en-US',{maximumFractionDigits:0}) : '—'}</span>
+      <span style="color:${rsi<35?'var(--green)':rsi>65?'var(--amber)':'var(--muted)'}">${rsi}</span>
+      <span style="color:${momentum5>0?'var(--green)':'var(--red)'}">${momentum5>=0?'+':''}${momentum5.toFixed(3)}%</span>
+      <span style="color:${volRatio>1.5?'var(--green)':volRatio>1?'var(--amber)':'var(--red)'}">${volRatio.toFixed(1)}x</span>
+      <span style="color:var(--green);font-weight:600">${polyPrice.toFixed(1)}¢</span>
+      <span style="color:${sigs.score>=75?'var(--green)':sigs.score>=50?'var(--amber)':'var(--red)'}">${sigs.score}%</span>
+      <span><span class="badge ${won?'badge-green':'badge-red'}">${won?'✓ Won':'✗ Expired'}</span></span>
+    `;
+    const lb = document.getElementById('log-body');
+    if (lb.querySelector('.empty-log')) lb.innerHTML = '';
+    lb.insertBefore(row, lb.firstChild);
+  }
+}
+
+function setStatus(type, text) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  dot.className = 'live-dot' + (type === 'warn' ? ' warn' : type === 'off' ? ' off' : '');
+  txt.textContent = text;
+}
+
+async function tick() {
+  if (!state.running) return;
+  const price = await fetchBTCPrice();
+  if (price) {
+    const label = getMinLabel();
+    btcChart.data.labels.push(label);
+    btcChart.data.datasets[0].data.push(price);
+    if (btcChart.data.labels.length > 40) {
+      btcChart.data.labels.shift();
+      btcChart.data.datasets[0].data.shift();
+    }
+    btcChart.update('none');
+  }
+  computeIndicators();
+  updateUI();
+}
+
+function toggleRun() {
+  state.running = !state.running;
+  const btn = document.getElementById('toggle-btn');
+  btn.textContent = state.running ? '⏸ Pause' : '▶ Resume';
+  if (!state.running) setStatus('off', 'Paused');
+  else { setStatus('live', 'Binance connected · live'); tick(); }
+}
+
+function resetAll() {
+  state.prices = []; state.volumes = []; state.scanned = 0;
+  state.opps = 0; state.pnl = 0; state.spent = 0; state.logCount = 0;
+  btcChart.data.labels = [];
+  btcChart.data.datasets[0].data = [];
+  btcChart.update('none');
+  document.getElementById('log-body').innerHTML = '<div class="empty-log">→ Scanning for opportunities below threshold...</div>';
+  document.getElementById('log-count').textContent = '0 entries';
+}
+
+function updateBudget(val) {
+  state.budget = parseInt(val);
+  document.getElementById('budget-out').textContent = '$' + val;
+  state.spent = Math.min(state.spent, state.budget);
+}
+
+// Set refresh interval
+let currentInterval = setInterval(tick, 5000);
+document.getElementById('refresh-rate').addEventListener('change', function() {
+  clearInterval(currentInterval);
+  currentInterval = setInterval(tick, parseInt(this.value));
+});
+
+// Init
+fetchKlines().then(() => tick());
+setInterval(fetchKlines, 60000);
+</script>
+</body>
+</html>
